@@ -154,7 +154,7 @@ public class DumpTfidfVectors {
                     if (tfidf == null) {
                         LOG.error("Cannot find word " + docKey + " in index.");
                     } else {
-                        bw.write(docKey + " " + tfidf);
+                        bw.write(docKey.bytes().utf8ToString() + " " + tfidf + "\n");
                     }
                 }
             }

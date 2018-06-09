@@ -109,6 +109,7 @@ public class DumpTfidfVectors {
         BufferedWriter bw = new BufferedWriter(fw);
 
         int len = reader.numDocs();
+        int numNonEmptyDocs = reader.getDocCount(LuceneDocumentGenerator.FIELD_BODY);
         if (len > 0) {
             String docName = reader.document(0).get(docIdName);
             if (docName == null) {
@@ -139,7 +140,7 @@ public class DumpTfidfVectors {
                     docKey = entry.getKey();
                     docValue = entry.getValue();
 
-                    tfidf = toTfidf(docKey, docValue, len);
+                    tfidf = toTfidf(docKey, docValue, numNonEmptyDocs);
                     if (tfidf == null) {
                         LOG.error("Cannot find word " + docKey + " in index.");
                     } else {

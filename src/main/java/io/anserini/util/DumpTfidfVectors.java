@@ -11,15 +11,10 @@ import io.anserini.index.IndexUtils;
 import io.anserini.index.generator.LuceneDocumentGenerator;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.lucene.analysis.CharArraySet;
-import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.FSDirectory;
 
 import org.kohsuke.args4j.CmdLineException;
@@ -59,13 +54,7 @@ public class DumpTfidfVectors {
         this.docFreq = new HashMap<>();
     }
 
-    private int getDocFreq(Term term) throws ParseException, IOException {
-//        EnglishAnalyzer ea = new EnglishAnalyzer(CharArraySet.EMPTY_SET);
-//        QueryParser qp = new QueryParser(LuceneDocumentGenerator.FIELD_BODY, ea);
-//        TermQuery q = (TermQuery)qp.parse(termStr);
-//        Term t = q.getTerm();
-
-
+    private int getDocFreq(Term term) {
         if (docFreq.containsKey(term)) {
             return docFreq.get(term);
         }
@@ -135,7 +124,6 @@ public class DumpTfidfVectors {
 
         for (int i = 0; i < len; i++) {
             String docid = reader.document(i).get(docIdName);
-            bw.write("docid: " + docid + "\n");
 
             Map<Term, Long> docVector = getTermFreq(docid);
 
@@ -146,6 +134,7 @@ public class DumpTfidfVectors {
             if (docVector == null || docVector.size() == 0) {
                 LOG.warn("Empty document with id " + docid);
             } else {
+                bw.write(docid + "\n");
                 for (Map.Entry<Term, Long> entry : docVector.entrySet()) {
                     docKey = entry.getKey();
                     docValue = entry.getValue();
@@ -157,6 +146,7 @@ public class DumpTfidfVectors {
                         bw.write(docKey.bytes().utf8ToString() + " " + tfidf + "\n");
                     }
                 }
+                bw.write("\n");
             }
 
 

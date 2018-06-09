@@ -103,7 +103,31 @@ public class DumpTfidfVectors {
     }
 
 
-    public void writeTfidf(String docIdName, String output) throws IOException, DumpTfidfVectors.IDNameException {
+    /**
+     *
+     * @param docIdName The field name of doc id stored in Lucene Document.
+     *                  Default is LuceneDocumentGenerator.FIELD_ID
+     * @param output The output path of the file containing tf-idf vector of each doc
+     * @throws IOException that Lucene API throws
+     * @throws DumpTfidfVectors.IDNameException when id field name is wrong
+     * @throws IndexUtils.NotStoredException when `-storeDocvector` is not enabled while indexing
+     *
+     * This method will write a file to `output` with the following format:
+     *
+     * DOC_ID#1
+     * TERM#1 TF_IDF#1
+     * TERM#2 TF_IDF#2
+     * ...
+     * TERM#N TF_IDF#N
+     * [Empty Line]
+     * DOC_ID#2
+     * TERM#1 TF_IDF#1
+     * TERM#2 TF_IDF#2
+     * ...
+     *
+     */
+    public void writeTfidf(String docIdName, String output)
+            throws IOException, DumpTfidfVectors.IDNameException, IndexUtils.NotStoredException {
 
         FileWriter fw = new FileWriter(new File(output));
         BufferedWriter bw = new BufferedWriter(fw);
@@ -132,7 +156,9 @@ public class DumpTfidfVectors {
             long docValue;
             String tfidf;
 
-            if (docVector == null || docVector.size() == 0) {
+            if (docVector == null) {
+                throw new IndexUtils.NotStoredException("Document vector not stored!");
+            } else if (docVector.size() == 0) {
                 LOG.warn("Empty document with id " + docid);
             } else {
                 bw.write(docid + "\n");
@@ -158,7 +184,7 @@ public class DumpTfidfVectors {
         bw.close();
     }
 
-    public static void main(String[] args) throws IOException, DumpTfidfVectors.IDNameException {
+    public static void main(String[] args) throws IOException {
         DumpTfidfVectors.Args indexArgs = new DumpTfidfVectors.Args();
         CmdLineParser parser = new CmdLineParser(indexArgs, ParserProperties
                 .defaults().withUsageWidth(90));

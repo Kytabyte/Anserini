@@ -2,6 +2,7 @@ package io.anserini.util;
 
 import java.io.*;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -73,8 +74,10 @@ public class TopicTokenizer {
         final TopicTokenizer tt = new TopicTokenizer();
         try {
             TopicReader tr = (TopicReader)Class.forName("io.anserini.search.query."+ttArgs.topicReader+"TopicReader")
-                    .getConstructor(Path.class).newInstance(ttArgs.input);
+                    .getConstructor(Path.class).newInstance(Paths.get(ttArgs.input));
+            LOG.info("topicReader is " + ttArgs.topicReader);
             SortedMap<Integer, Map<String, String>> topics = tr.read();
+            LOG.info("Num of topics " + topics.size());
             Analyzer analyzer = ttArgs.keepstop ? new EnglishAnalyzer(CharArraySet.EMPTY_SET) : new EnglishAnalyzer();
 
             tt.writeTokenizedWord(topics, analyzer, ttArgs.output, ttArgs.topicfield);

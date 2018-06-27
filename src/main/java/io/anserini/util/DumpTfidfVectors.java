@@ -37,6 +37,12 @@ public class DumpTfidfVectors {
         @Option(name = "-docIdName", metaVar = "[String]", required = false, usage = "Field Name of document ID")
         String docIdName = LuceneDocumentGenerator.FIELD_ID;
 
+        @Option(name = "-dropDfByNum", metaVar = "[int]", required = false, usage = "drop df less than given number")
+        int dfThreshold = 0;
+
+        @Option(name = "-dropDfByRatio", metaVar = "[float]", required = false, usage = "drop df less than given ratio")
+        float dfRatioThreshold = 0f;
+
         @Option(name = "-output", metaVar = "[String]", required = true, usage = "Output Path")
         String output;
     }
@@ -89,12 +95,16 @@ public class DumpTfidfVectors {
         return termFreq;
     }
 
-    private String toTfidf(Term term, long termFreq, int numDocs) {
+    private String toTfidf(Term term, long termFreq, int numDocs, int threshold) {
         int docFreq;
         try {
             docFreq = getDocFreq(term);
         } catch (Exception e) {
             return null;
+        }
+
+        if (docFreq < threshold) {
+            return String.valueOf(0);
         }
 
         String tfidf = String.format("%.6f", termFreq * Math.log(numDocs * 1.0 / docFreq));
@@ -126,7 +136,7 @@ public class DumpTfidfVectors {
      * ...
      *
      */
-    public void writeTfidf(String docIdName, String output)
+    public void writeTfidf(String docIdName, String output, int threshold)
             throws IOException, DumpTfidfVectors.IDNameException, IndexUtils.NotStoredException {
 
         FileWriter fw = new FileWriter(new File(output));
@@ -166,10 +176,10 @@ public class DumpTfidfVectors {
                     docKey = entry.getKey();
                     docValue = entry.getValue();
 
-                    tfidf = toTfidf(docKey, docValue, numNonEmptyDocs);
+                    tfidf = toTfidf(docKey, docValue, numNonEmptyDocs, threshold);
                     if (tfidf == null) {
                         LOG.error("Cannot find word " + docKey + " in index.");
-                    } else {
+                    } else if (!tfidf.equals("0")) {
                         bw.write(docKey.bytes().utf8ToString() + " " + tfidf + "\n");
                     }
                 }
@@ -182,6 +192,23 @@ public class DumpTfidfVectors {
             }
         }
         bw.close();
+    }
+
+    private int getDropDfThreshold(int numThreshold, float ratioThreshold) throws IOException {
+
+        if (numThreshold > 0) {
+            return numThreshold;
+        }
+
+        if (ratioThreshold > 0) {
+            int numNonEmptyDocs = reader.getDocCount(LuceneDocumentGenerator.FIELD_BODY);
+            int threshold = (int) (numNonEmptyDocs * ratioThreshold);
+
+            return threshold;
+        }
+
+        return 0;
+
     }
 
     public static void main(String[] args) throws IOException {
@@ -199,7 +226,8 @@ public class DumpTfidfVectors {
 
         final DumpTfidfVectors tfidfVectors = new DumpTfidfVectors(indexArgs.indexPath);
         try {
-            tfidfVectors.writeTfidf(indexArgs.docIdName, indexArgs.output);
+            int threshold = tfidfVectors.getDropDfThreshold(indexArgs.dfThreshold, indexArgs.dfRatioThreshold);
+            tfidfVectors.writeTfidf(indexArgs.docIdName, indexArgs.output, threshold);
         } catch (Exception e) {
             LOG.error(e.getMessage());
         }

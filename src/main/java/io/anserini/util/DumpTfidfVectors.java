@@ -43,6 +43,9 @@ public class DumpTfidfVectors {
         @Option(name = "-dropDfByRatio", metaVar = "[float]", required = false, usage = "drop df less than given ratio")
         float dfRatioThreshold = 0f;
 
+        @Option(name = "-dropTfidf", metaVar = "[float]", required = false, usage = "drop df less than given ratio")
+        float tfidfThreshold = 0f;
+
         @Option(name = "-output", metaVar = "[String]", required = true, usage = "Output Path")
         String output;
     }
@@ -136,7 +139,7 @@ public class DumpTfidfVectors {
      * ...
      *
      */
-    public void writeTfidf(String docIdName, String output, int threshold)
+    public void writeTfidf(String docIdName, String output, int dfThreshold, float tfidfThreshold)
             throws IOException, DumpTfidfVectors.IDNameException, IndexUtils.NotStoredException {
 
         FileWriter fw = new FileWriter(new File(output));
@@ -176,10 +179,9 @@ public class DumpTfidfVectors {
                     docKey = entry.getKey();
                     docValue = entry.getValue();
 
-                    tfidf = toTfidf(docKey, docValue, numNonEmptyDocs, threshold);
-                    if (tfidf == 0) {
-                        // LOG.info("Dropped term " + docKey + " in index.");
-                    } else {
+                    tfidf = toTfidf(docKey, docValue, numNonEmptyDocs, dfThreshold);
+                    
+                    if (tfidf > tfidfThreshold) {
                         bw.write(docKey.bytes().utf8ToString() + " " + String.format("%.6f", tfidf) + "\n");
                     }
                 }
@@ -226,8 +228,8 @@ public class DumpTfidfVectors {
 
         final DumpTfidfVectors tfidfVectors = new DumpTfidfVectors(indexArgs.indexPath);
         try {
-            int threshold = tfidfVectors.getDropDfThreshold(indexArgs.dfThreshold, indexArgs.dfRatioThreshold);
-            tfidfVectors.writeTfidf(indexArgs.docIdName, indexArgs.output, threshold);
+            int dfThreshold = tfidfVectors.getDropDfThreshold(indexArgs.dfThreshold, indexArgs.dfRatioThreshold);
+            tfidfVectors.writeTfidf(indexArgs.docIdName, indexArgs.output, dfThreshold, indexArgs.tfidfThreshold);
         } catch (Exception e) {
             LOG.error(e.getMessage());
         }

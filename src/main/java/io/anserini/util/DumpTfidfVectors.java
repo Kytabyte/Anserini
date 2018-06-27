@@ -95,21 +95,21 @@ public class DumpTfidfVectors {
         return termFreq;
     }
 
-    private String toTfidf(Term term, long termFreq, int numDocs, int threshold) {
+    private float toTfidf(Term term, long termFreq, int numDocs, int threshold) {
         int docFreq;
         try {
             docFreq = getDocFreq(term);
         } catch (Exception e) {
-            return null;
+            docFreq = 0;
         }
 
         if (docFreq < threshold) {
-            return String.valueOf(0);
+            return 0f;
         }
 
-        String tfidf = String.format("%.6f", termFreq * Math.log(numDocs * 1.0 / docFreq));
+        // String tfidf = String.format("%.6f", termFreq * Math.log(numDocs * 1.0 / docFreq));
 
-        return tfidf;
+        return (float) (termFreq * Math.log(numDocs * 1.0 / docFreq));
     }
 
 
@@ -164,7 +164,7 @@ public class DumpTfidfVectors {
 
             Term docKey;
             long docValue;
-            String tfidf;
+            float tfidf;
 
             if (docVector == null) {
                 throw new IndexUtils.NotStoredException("Document vector not stored!");
@@ -177,10 +177,10 @@ public class DumpTfidfVectors {
                     docValue = entry.getValue();
 
                     tfidf = toTfidf(docKey, docValue, numNonEmptyDocs, threshold);
-                    if (tfidf == null) {
-                        LOG.error("Cannot find word " + docKey + " in index.");
-                    } else if (!tfidf.equals("0")) {
-                        bw.write(docKey.bytes().utf8ToString() + " " + tfidf + "\n");
+                    if (tfidf == 0) {
+                        // LOG.info("Dropped term " + docKey + " in index.");
+                    } else {
+                        bw.write(docKey.bytes().utf8ToString() + " " + String.format("%.6f", tfidf) + "\n");
                     }
                 }
                 bw.write("\n");

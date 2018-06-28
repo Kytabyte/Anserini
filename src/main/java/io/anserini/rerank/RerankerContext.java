@@ -1,29 +1,46 @@
+/**
+ * Anserini: An information retrieval toolkit built on Lucene
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.anserini.rerank;
 
+import io.anserini.search.SearchArgs;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 
 import java.io.IOException;
 import java.util.List;
 
-public class RerankerContext {
+public class RerankerContext<K> {
   private final IndexSearcher searcher;
   private final Query query;
-  private final String queryId;
+  private final K queryId;
   private final String queryText;
   private final List<String> queryTokens;
   private final Query filter;
-  private final String termVectorField;
+  private final SearchArgs searchArgs;
 
-  public RerankerContext(IndexSearcher searcher, Query query, String queryId, String queryText,
-                         List<String> queryTokens, String termVectorField, Query filter) throws IOException {
+  public RerankerContext(IndexSearcher searcher, K queryId, Query query, String queryText,
+      List<String> queryTokens, Query filter, SearchArgs searchArgs) throws IOException {
     this.searcher = searcher;
     this.query = query;
     this.queryId = queryId;
     this.queryText = queryText;
     this.queryTokens = queryTokens;
     this.filter = filter;
-    this.termVectorField = termVectorField;
+    this.searchArgs = searchArgs;
   }
 
   public IndexSearcher getIndexSearcher() {
@@ -38,7 +55,7 @@ public class RerankerContext {
     return query;
   }
 
-  public String getQueryId() {
+  public K getQueryId() {
     return queryId;
   }
 
@@ -50,5 +67,7 @@ public class RerankerContext {
     return queryTokens;
   }
 
-  public String getField() {return termVectorField; }
+  public SearchArgs getSearchArgs() {
+    return searchArgs;
+  }
 }

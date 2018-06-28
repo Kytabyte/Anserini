@@ -24,11 +24,11 @@ import java.util.*;
 /**
  * Feature extractor class that forms the base for other feature extractors
  */
-abstract public class BaseFeatureExtractor {
+abstract public class BaseFeatureExtractor<K> {
     private static final Logger LOG = LogManager.getLogger(BaseFeatureExtractor.class);
     private IndexReader reader;
     private Qrels qrels;
-    private Map<Integer, Map<String, String>> topics;
+    private Map<K, Map<String, String>> topics;
     private Analyzer queryAnalyzer;
     private final FeatureExtractors customFeatureExtractors;
 
@@ -48,7 +48,7 @@ abstract public class BaseFeatureExtractor {
 
     abstract protected Query docIdQuery(String docId);
 
-    public static String constructOutputString(String qid, int qrel, String docId, float[] features) {
+    public static<K> String constructOutputString(K qid, int qrel, String docId, float[] features) {
       StringBuilder sb = new StringBuilder();
       sb.append(qrel);
       sb.append(" ");
@@ -72,7 +72,7 @@ abstract public class BaseFeatureExtractor {
      * @param docId         The stored Doc Id
      * @param features      The feature vector in featureNum:value form
      */
-    public static void writeFeatureVector(PrintStream out, String qid, int qrel, String docId, float[] features) {
+    public static<K> void writeFeatureVector(PrintStream out, K qid, int qrel, String docId, float[] features) {
         out.print(constructOutputString(qid, qrel, docId,features));
         out.print("\n");
     }
@@ -87,7 +87,7 @@ abstract public class BaseFeatureExtractor {
    * @return
    */
     static BaseFeatureExtractor parseExtractorsFromFile(IndexReader reader, Qrels qrels,
-                                Map<Integer, Map<String, String>> topics, String definitionFile) {
+                                Map<String, Map<String, String>> topics, String definitionFile) {
 
       return null;
     }
@@ -98,7 +98,7 @@ abstract public class BaseFeatureExtractor {
      * @param qrels
      * @param topics
      */
-    public BaseFeatureExtractor(IndexReader reader, Qrels qrels, Map<Integer, Map<String,String>> topics,
+    public BaseFeatureExtractor(IndexReader reader, Qrels qrels, Map<K, Map<String,String>> topics,
                                 FeatureExtractors extractors) {
         this.reader = reader;
         this.qrels = qrels;
@@ -123,11 +123,10 @@ abstract public class BaseFeatureExtractor {
             q = parseQuery(queryText);
             List<String> queryTokens = AnalyzerUtils.tokenize(queryAnalyzer, queryText);
             // Construct the reranker context
-            RerankerContext context = new RerankerContext(searcher, q,
-                    qid, queryText,
+            RerankerContext context = new RerankerContext(searcher, qid,
+                    q, queryText,
                     queryTokens,
-                    getTermVectorField(),
-                    null);
+                    null, null);
 
             queryContextMap.put(qid, context);
 

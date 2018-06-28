@@ -1,5 +1,6 @@
 package io.anserini.ltr.feature.base;
 
+import io.anserini.index.generator.LuceneDocumentGenerator;
 import io.anserini.ltr.feature.FeatureExtractor;
 import io.anserini.rerank.RerankerContext;
 import org.apache.logging.log4j.LogManager;
@@ -30,12 +31,12 @@ public class TFIDFFeatureExtractor implements FeatureExtractor{
     Map<String, Integer> docFreqs = new HashMap<>();
     IndexReader reader = context.getIndexSearcher().getIndexReader();
     long numDocs =  reader.numDocs();
-    for (String queryToken : context.getQueryTokens()) {
+    for (Object queryToken : context.getQueryTokens()) {
       try {
-        docFreqs.put(queryToken, reader.docFreq(new Term(context.getField(), queryToken)));
+        docFreqs.put((String)queryToken, reader.docFreq(new Term(LuceneDocumentGenerator.FIELD_BODY, (String)queryToken)));
       } catch (IOException e) {
         LOG.error("Error trying to read document frequency");
-        docFreqs.put(queryToken, 0);
+        docFreqs.put((String)queryToken, 0);
       }
     }
 
@@ -57,7 +58,7 @@ public class TFIDFFeatureExtractor implements FeatureExtractor{
     // how many of our query tokens were found
     float coord = similarity.coord(countMap.size(), context.getQueryTokens().size());
 
-    for (String token : context.getQueryTokens()) {
+    for (Object token : context.getQueryTokens()) {
       long termFreq = countMap.containsKey(token) ? countMap.get(token) : 0;
       long docFreq = docFreqs.containsKey(token) ? docFreqs.get(token) : 0;
       float tf = similarity.tf(termFreq);

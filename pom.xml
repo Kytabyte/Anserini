@@ -152,6 +152,10 @@
                   <mainClass>io.anserini.util.DumpTfidfVectors</mainClass>
                   <name>DumpTfidfVectors</name>
               </program>
+              <program>
+                  <mainClass>io.anserini.util.DumpRawDocs</mainClass>
+                  <name>DumpRawDocs</name>
+              </program>
             <program>
               <mainClass>io.anserini.util.ExtractRm3Stopwords</mainClass>
               <name>ExtractRm3Stopwords</name>

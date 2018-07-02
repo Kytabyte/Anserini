@@ -111,6 +111,10 @@ public class DumpRawDocs {
         bw.write(rawDoc + "\n");
         bw.write("</doc>\n");
       }
+
+      if ((i % 100000) == 0) {
+        LOG.info("DumpDocids: " + i + " docs got");
+      }
     }
   }
 

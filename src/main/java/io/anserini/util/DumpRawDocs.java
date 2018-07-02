@@ -14,6 +14,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.*;
 import org.apache.lucene.store.FSDirectory;
 
+import org.jsoup.Jsoup;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -39,6 +40,9 @@ public class DumpRawDocs {
 
     @Option(name = "-output", metaVar = "[String]", required = true, usage = "Output Path")
     String output;
+
+    @Option(name = "-transformer", metaVar = "[boolean]", required = false, usage = "use Jsoup transformer")
+    boolean transformer = false;
   }
 
   public class IDNameException extends Exception {
@@ -70,7 +74,7 @@ public class DumpRawDocs {
     return docids;
   }
 
-  private void writeDocs(String docIdName, String output, Set<String> filteredDocid)
+  private void writeDocs(String docIdName, String output, Set<String> filteredDocid, boolean transformer)
           throws IOException, DumpRawDocs.IDNameException, IndexUtils.NotStoredException {
     FileWriter fw = new FileWriter(new File(output));
     BufferedWriter bw = new BufferedWriter(fw);
@@ -97,9 +101,15 @@ public class DumpRawDocs {
         if (doc == null) {
           throw new IndexUtils.NotStoredException("Raw documents not stored!");
         }
+
+        String rawDoc = doc.stringValue();
+        if (transformer) {
+          rawDoc = Jsoup.parse(rawDoc).text();
+        }
+
         bw.write("<doc> " + docid + "\n");
-        bw.write(doc.stringValue() + "\n");
-        bw.write("</doc>");
+        bw.write(rawDoc + "\n");
+        bw.write("</doc>\n");
       }
     }
   }
@@ -120,7 +130,7 @@ public class DumpRawDocs {
     final DumpRawDocs rawDocs = new DumpRawDocs(indexArgs.indexPath);
     try {
       Set<String> filteredDocid = rawDocs.getFilteredDocid(indexArgs.filterPath);
-      rawDocs.writeDocs(indexArgs.docIdName, indexArgs.output, filteredDocid);
+      rawDocs.writeDocs(indexArgs.docIdName, indexArgs.output, filteredDocid, indexArgs.transformer);
     } catch (Exception e) {
       LOG.error(e.getMessage());
     }

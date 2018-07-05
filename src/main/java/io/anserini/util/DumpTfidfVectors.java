@@ -167,7 +167,8 @@ public class DumpTfidfVectors {
       float tfidf;
 
       if (docVector == null) {
-        throw new IndexUtils.NotStoredException("Document vector not stored!");
+        // throw new IndexUtils.NotStoredException("Document vector not stored!");
+        LOG.warn("Document vector not stored for doc " + docid);
       } else if (docVector.size() == 0) {
         LOG.warn("Empty document with id " + docid);
       } else {

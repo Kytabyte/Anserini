@@ -19,7 +19,7 @@ import java.io.PrintStream;
  * A reranker that will be used to dump feature vectors
  * for documents retrieved from a search
  */
-public class WebCollectionLtrDataGenerator implements Reranker{
+public class WebCollectionLtrDataGenerator implements Reranker<Integer> {
   private static final Logger LOG = LogManager.getLogger(WebCollectionLtrDataGenerator.class);
 
   private PrintStream out;
@@ -37,10 +37,10 @@ public class WebCollectionLtrDataGenerator implements Reranker{
   }
 
   @Override
-  public ScoredDocuments rerank(ScoredDocuments docs, RerankerContext context) {
+  public ScoredDocuments rerank(ScoredDocuments docs, RerankerContext<Integer> context) {
     Document[] documents = docs.documents;
     IndexReader reader = context.getIndexSearcher().getIndexReader();
-    String qid = context.getQueryId();
+    int qid = context.getQueryId();
     LOG.info("Beginning rerank");
     for (int i =0; i < docs.documents.length; i++ ) {
       try {
@@ -49,7 +49,7 @@ public class WebCollectionLtrDataGenerator implements Reranker{
         String docId = documents[i].get(LuceneDocumentGenerator.FIELD_ID);
         // QREL 0 in this case, will be assigned if needed later
         //qid
-        BaseFeatureExtractor.writeFeatureVector(out,qid, this.qrels.getRelevanceGrade(qid, docId), docId,  features);
+        BaseFeatureExtractor.writeFeatureVector(out, qid, this.qrels.getRelevanceGrade(qid, docId), docId,  features);
         LOG.info("Finished writing vectors");
       } catch (IOException e) {
         LOG.error(String.format("IOExecption trying to retrieve feature vector for %d doc", docs.ids[i]));

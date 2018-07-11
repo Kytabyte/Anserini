@@ -1,7 +1,6 @@
 package io.anserini.ltr.feature;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.gson.GsonBuilder;
 import io.anserini.ltr.feature.base.*;
 import io.anserini.ltr.feature.twitter.*;
 import io.anserini.rerank.RerankerContext;
@@ -14,7 +13,7 @@ import java.util.Map;
 /**
  * A feature extractor.
  */
-public interface FeatureExtractor {
+public interface FeatureExtractor<T> {
   //********************************************************
   // TODO normalize names
   Map<String, Class<?>> EXTRACTOR_MAP = new ImmutableMap.Builder<String, Class<?>>()
@@ -40,13 +39,7 @@ public interface FeatureExtractor {
           .put("TwitterFollowerCount", TwitterFollowerCount.class)
           .put("TwitterFriendCount", TwitterFriendCount.class).build();
 
-  GsonBuilder BUILDER = new GsonBuilder()
-          .registerTypeAdapter(OrderedSequentialPairsFeatureExtractor.class, new OrderedSequentialPairsFeatureExtractor.Deserializer())
-          .registerTypeAdapter(OrderedQueryPairsFeatureExtractor.class, new OrderedQueryPairsFeatureExtractor.Deserializer())
-          .registerTypeAdapter(UnorderedQueryPairsFeatureExtractor.class, new UnorderedQueryPairsFeatureExtractor.Deserializer())
-          .registerTypeAdapter(UnorderedSequentialPairsFeatureExtractor.class, new UnorderedSequentialPairsFeatureExtractor.Deserializer());
-
-  float extract(Document doc, Terms terms, RerankerContext context);
+  float extract(Document doc, Terms terms, RerankerContext<T> context);
 
   String getName();
 

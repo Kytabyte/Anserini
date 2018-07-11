@@ -1,14 +1,13 @@
 # Anserini Experiments on Washington Post Collection
 
-Indexing:
+**Indexing**:
 
-```bash
-nohup sh target/appassembler/bin/IndexCollection \
--collection WaPostCollection -input /path/to/wapo_data \
--generator LuceneDocumentGenerator \
--index lucene-index.wapo.pos+docvectors -threads 12 \
--storePositions -storeDocvectors \
--optimize > log.wapo.pos+docvectors &
+```
+nohup sh target/appassembler/bin/IndexCollection -collection WashingtonPostCollection \
+ -input /path/to/wapo_data -generator LuceneDocumentGenerator \
+ -index lucene-index.wapo.pos+docvectors -threads 16 \
+ -storePositions -storeDocvectors -storeRawDocs -optimize \
+ >& log.wapo.pos+docvectors+rawdocs &
 ```
 
 The directory `/path/to/wapo_data` should be the directory that contains a collection of Washington post corpus files, i.e., ` ls /path/to/wapo_data` should bring up all corpus files, e.g ` TREC_article_2012.txt`. The command above builds a standard positional index 
@@ -17,9 +16,12 @@ The directory `/path/to/wapo_data` should be the directory that contains a colle
 (`-storePositions`) as well as doc vectors for relevance feedback (`-storeDocvectors`), and `-optimize` force merges all 
 index segment into one.
 
-After indexing is done, you should be able to perform a retrieval as follows:
 
-```bash
+**Search**:
+
+After indexing is done, you should be able to perform a retrieval run:
+
+```
 sh target/appassembler/bin/SearchCollection \
 -topicreader Trec -index lucene-index.wapo.pos+docvectors \
 -bm25 -topics src/main/resources/topics-and-qrels/topics.web.251-300.txt  \

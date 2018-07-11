@@ -1,17 +1,29 @@
+/**
+ * Anserini: An information retrieval toolkit built on Lucene
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.anserini.document;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import java.io.BufferedReader;
-import java.io.IOException;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.databind.*;
+
+import java.io.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalLong;
+import java.util.*;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -19,34 +31,35 @@ import org.apache.logging.log4j.Logger;
  * A Twitter document (status).
  */
 public class TweetDocument implements SourceDocument {
+  // Required fields
   protected String screenname;
-  protected String name;
-  protected String profile_image_url;
-  protected String createdAt;
-  protected long timestamp_ms;
-  protected long epoch;
-  protected JsonObject jsonObject;
-  protected String jsonString;
-  protected Optional<String> lang;
-  protected OptionalLong inReplyToStatusId;
-  protected OptionalLong inReplyToUserId;
   protected int followersCount;
   protected int friendsCount;
   protected int statusesCount;
+  protected String createdAt;
+  protected String id;
+  protected long idLong;
+  protected String text;
+  protected Status jsonObject;
+  protected String jsonString;
+
+  // Optional fields
+  protected Optional<String> name;
+  protected Optional<String> profile_image_url;
+  protected OptionalLong timestamp_ms;
+  protected OptionalLong epoch;
+  protected Optional<String> lang;
+  protected OptionalLong inReplyToStatusId;
+  protected OptionalLong inReplyToUserId;
   protected OptionalDouble latitude;
   protected OptionalDouble longitude;
   protected OptionalLong retweetStatusId;
   protected OptionalLong retweetUserId;
   protected OptionalLong retweetCount;
-  protected String retweetStatusString;
 
   //private boolean keepRetweets;
-  protected long idLong;
-  protected String id;
-  protected String text;
 
   private static final Logger LOG = LogManager.getLogger(TweetDocument.class);
-  private static final JsonParser JSON_PARSER = new JsonParser();
   private static final String DATE_FORMAT = "E MMM dd HH:mm:ss ZZZZZ yyyy"; // "Fri Mar 29 11:03:41 +0000 2013"
 
   public TweetDocument() {
@@ -54,76 +67,114 @@ public class TweetDocument implements SourceDocument {
   }
 
   @Override
-  public TweetDocument readNextRecord(BufferedReader reader) throws Exception {
+  public TweetDocument readNextRecord(BufferedReader reader) throws IOException {
     String line;
-    while ((line = reader.readLine()) != null) {
-      return fromJson(line);
+    try {
+      while ((line = reader.readLine()) != null) {
+        if (fromJson(line)) {
+          return this;
+        } // else: not desired JSON data, read the next line
+      }
+    } catch (IOException e) {
+      LOG.error("Exception from BufferedReader:", e);
     }
     return null;
   }
 
-  public TweetDocument fromJson(String json) throws Exception {
-    JsonObject obj = null;
-    obj = (JsonObject) JSON_PARSER.parse(json);
-    id = obj.get("id").getAsString();
-    idLong = Long.parseLong(id);
-    text = obj.get("text").getAsString();
-    screenname = obj.get("user").getAsJsonObject().get("screen_name").getAsString();
-    name = obj.get("user").getAsJsonObject().get("name").getAsString();
-    profile_image_url = obj.get("user").getAsJsonObject().get("profile_image_url").getAsString();
-    createdAt = obj.get("created_at").getAsString();
-
+  public boolean fromJson(String json) {
+    ObjectMapper mapper = new ObjectMapper();
+    Status tweetObj = null;
     try {
-      timestamp_ms = (new SimpleDateFormat(DATE_FORMAT, Locale.ENGLISH)).parse(createdAt).getTime();
-      epoch = timestamp_ms / 1000;
-    } catch (ParseException e) {
-      //LOG.debug(e);
-      timestamp_ms = -1L;
-      epoch = -1L;
+      tweetObj = mapper
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES) // Ignore unrecognized properties
+        .registerModule(new Jdk8Module()) // Deserialize Java 8 Optional: http://www.baeldung.com/jackson-optional
+        .readValue(json, Status.class);
+    } catch (IOException e) {
+      return false;
     }
 
-    inReplyToStatusId = (!obj.has("in_reply_to_status_id") || obj.get("in_reply_to_status_id").isJsonNull()) ?
-        OptionalLong.empty() : OptionalLong.of(obj.get("in_reply_to_status_id").getAsLong());
+    if (tweetObj.delete() != null && tweetObj.delete().isPresent()) {
+      return false;
+    }
 
-    inReplyToUserId = (!obj.has("in_reply_to_user_id") || obj.get("in_reply_to_user_id").isJsonNull()) ?
-        OptionalLong.empty() : OptionalLong.of(obj.get("in_reply_to_user_id").getAsLong());
+    id = tweetObj.id_str();
+    idLong = Long.parseLong(tweetObj.id_str());
+    text = tweetObj.text();
+    createdAt = tweetObj.created_at();
 
-    if (!obj.has("retweeted_status") || obj.get("retweeted_status").isJsonNull()) {
+    try {
+      timestamp_ms = OptionalLong.of((new SimpleDateFormat(DATE_FORMAT, Locale.ENGLISH)).parse(createdAt).getTime());
+      epoch = timestamp_ms.isPresent() ? OptionalLong.of(timestamp_ms.getAsLong() / 1000) : OptionalLong.empty();
+    } catch (ParseException e) {
+      timestamp_ms = OptionalLong.of(-1L);
+      epoch = OptionalLong.of(-1L);
+      return false;
+    }
+
+    if (tweetObj.in_reply_to_status_id() == null || !tweetObj.in_reply_to_status_id().isPresent()) {
+      inReplyToStatusId = OptionalLong.empty();
+    } else {
+      inReplyToStatusId = tweetObj.in_reply_to_status_id();
+    }
+
+    if (tweetObj.in_reply_to_user_id() == null || !tweetObj.in_reply_to_user_id().isPresent()) {
+      inReplyToUserId = OptionalLong.empty();
+    } else {
+      inReplyToUserId = tweetObj.in_reply_to_user_id();
+    }
+
+    if (tweetObj.retweeted_status() == null || !tweetObj.retweeted_status().isPresent()) {
       retweetStatusId = OptionalLong.empty();
       retweetUserId = OptionalLong.empty();
       retweetCount = OptionalLong.empty();
     } else {
-      retweetStatusId = OptionalLong.of(obj.getAsJsonObject("retweeted_status").get("id").getAsLong());
-      retweetUserId = OptionalLong.of(obj.getAsJsonObject("retweeted_status")
-          .get("user").getAsJsonObject().get("id").getAsLong());
-      // retweet_count might say "100+"
-      // TODO: This is ugly, come back and fix later.
-      retweetCount = OptionalLong.of(Long.parseLong(obj.get("retweet_count")
-          .getAsString().replace("+", "")));
+      retweetStatusId = tweetObj.retweeted_status().get().id();
+      if (tweetObj.retweeted_status().get().user() != null && tweetObj.retweeted_status().get().user().isPresent()) {
+        retweetUserId = tweetObj.retweeted_status().get().user().get().id();
+      } else {
+        retweetUserId = OptionalLong.empty();
+      }
+      retweetCount = tweetObj.retweet_count();
     }
 
-    if (!obj.has("coordinates") || obj.get("coordinates").isJsonNull()) {
+    if (tweetObj.coordinates() == null || !tweetObj.coordinates().isPresent() ||
+        tweetObj.coordinates().get().coordinates() == null ||
+        !tweetObj.coordinates().get().coordinates().isPresent() ||
+        tweetObj.coordinates().get().coordinates().get().size() < 2) {
       latitude = OptionalDouble.empty();
       longitude = OptionalDouble.empty();
     } else {
-      latitude = OptionalDouble.of(obj.getAsJsonObject("coordinates")
-          .getAsJsonArray("coordinates").get(1).getAsDouble());
-      longitude = OptionalDouble.of(obj.getAsJsonObject("coordinates")
-          .getAsJsonArray("coordinates").get(0).getAsDouble());
+      longitude = tweetObj.coordinates().get().coordinates().get().get(0);
+      latitude = tweetObj.coordinates().get().coordinates().get().get(1);
     }
 
-    String langOpt = (obj.get("lang") == null || obj.get("lang").isJsonNull()) ?
-        null  : obj.get("lang").getAsString();
-    lang = Optional.ofNullable(langOpt);
+    if (tweetObj.lang() == null || !tweetObj.lang().isPresent()) {
+      lang = Optional.empty();
+    } else {
+      lang = tweetObj.lang();
+    }
 
-    followersCount = obj.get("user").getAsJsonObject().get("followers_count").getAsInt();
-    friendsCount = obj.get("user").getAsJsonObject().get("friends_count").getAsInt();
-    statusesCount = obj.get("user").getAsJsonObject().get("statuses_count").getAsInt();
+    followersCount = tweetObj.user().followers_count();
+    friendsCount = tweetObj.user().friends_count();
+    statusesCount = tweetObj.user().statuses_count();
+    screenname = tweetObj.user().screen_name();
 
-    jsonObject = obj;
+    if (tweetObj.user().name() != null && tweetObj.user().name().isPresent()) {
+      name = tweetObj.user().name();
+    } else {
+      name = Optional.empty();
+    }
+
+    if (tweetObj.user().profile_image_url() != null && tweetObj.user().profile_image_url().isPresent()) {
+      profile_image_url = tweetObj.user().profile_image_url();
+    } else {
+      profile_image_url = Optional.empty();
+    }
+
     jsonString = json;
+    jsonObject = tweetObj;
 
-    return this;
+    return true;
   }
 
   public TweetDocument fromTSV(String tsv) {
@@ -167,26 +218,15 @@ public class TweetDocument implements SourceDocument {
   public String getScreenname() {
     return screenname;
   }
-  public String getName() {
-    return name;
-  }
-  public String getProfileImageURL() {
-    return profile_image_url;
-  }
   public String getCreatedAt() {
     return createdAt;
   }
-  public long getTimestampMs() { return timestamp_ms; }
-  public long getEpoch() { return epoch; }
   public String getText() {
     return text;
   }
-  public JsonObject getJsonObject() { return jsonObject; }
+  public Status getJsonObject() { return jsonObject; }
   public String getJsonString() {
     return jsonString;
-  }
-  public Optional<String> getLang() {
-    return lang;
   }
   public int getFollowersCount() {
     return followersCount;
@@ -196,6 +236,18 @@ public class TweetDocument implements SourceDocument {
   }
   public int getStatusesCount() {
     return statusesCount;
+  }
+
+  public Optional<String> getName() {
+    return name;
+  }
+  public Optional<String> getProfileImageURL() {
+    return profile_image_url;
+  }
+  public OptionalLong getTimestampMs() { return timestamp_ms; }
+  public OptionalLong getEpoch() { return epoch; }
+  public Optional<String> getLang() {
+    return lang;
   }
   public OptionalLong getInReplyToStatusId() {
     return inReplyToStatusId;
@@ -217,8 +269,5 @@ public class TweetDocument implements SourceDocument {
   }
   public OptionalLong getRetweetCount() {
     return retweetCount;
-  }
-  public String getRetweetStatusString() {
-    return retweetStatusString;
   }
 }

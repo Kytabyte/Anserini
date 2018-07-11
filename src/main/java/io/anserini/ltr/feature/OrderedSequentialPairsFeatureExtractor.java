@@ -1,11 +1,10 @@
 package io.anserini.ltr.feature;
 
 import com.google.common.collect.Sets;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.anserini.rerank.RerankerContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -13,7 +12,6 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Terms;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,7 +22,7 @@ import java.util.Set;
  * This feature extractor will return the number of phrases
  * in a specified gap size
  */
-public class OrderedSequentialPairsFeatureExtractor implements FeatureExtractor{
+public class OrderedSequentialPairsFeatureExtractor<T> implements FeatureExtractor<T> {
   private static final Logger LOG = LogManager.getLogger(OrderedSequentialPairsFeatureExtractor.class);
 
   protected static ArrayList<Integer> gapSizes = new ArrayList<>();
@@ -35,14 +33,22 @@ public class OrderedSequentialPairsFeatureExtractor implements FeatureExtractor{
   protected static String lastProcessedId = "";
   protected static Document lastProcessedDoc = null;
 
-  public static class Deserializer implements JsonDeserializer<OrderedSequentialPairsFeatureExtractor>
+  public static class Deserializer extends StdDeserializer<OrderedSequentialPairsFeatureExtractor>
   {
+    public Deserializer() {
+      this(null);
+    }
+
+    public Deserializer(Class<?> vc) {
+      super(vc);
+    }
+
     @Override
     public OrderedSequentialPairsFeatureExtractor
-    deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
-            throws JsonParseException
+    deserialize(JsonParser jsonParser, DeserializationContext context) throws IOException
     {
-      int gapSize = ((JsonObject) json).get("gapSize").getAsInt();
+      JsonNode node = jsonParser.getCodec().readTree(jsonParser);
+      int gapSize = node.get("gapSize").asInt();
       return new OrderedSequentialPairsFeatureExtractor(gapSize);
     }
   }
@@ -68,7 +74,7 @@ public class OrderedSequentialPairsFeatureExtractor implements FeatureExtractor{
   }
 
   @Override
-  public float extract(Document doc, Terms terms, RerankerContext context) {
+  public float extract(Document doc, Terms terms, RerankerContext<T> context) {
     try {
       return computeOrderedFrequencyScore(doc, terms, context);
     } catch (IOException e) {
@@ -94,11 +100,11 @@ public class OrderedSequentialPairsFeatureExtractor implements FeatureExtractor{
     }
   }
 
-  protected float computeOrderedFrequencyScore(Document doc, Terms terms, RerankerContext context) throws IOException {
+  protected float computeOrderedFrequencyScore(Document doc, Terms terms, RerankerContext<T> context) throws IOException {
 
     // Only compute the score once for all window sizes on the same document
     if (!context.getQueryId().equals(lastProcessedId) || lastProcessedDoc != doc) {
-      resetCounters(context.getQueryId(), doc);
+      resetCounters(context.getQueryId().toString(), doc);
 
       List<String> queryTokens = context.getQueryTokens();
       populateQueryPairMap(queryTokens);
@@ -111,12 +117,13 @@ public class OrderedSequentialPairsFeatureExtractor implements FeatureExtractor{
     // Smoothing count of 1
     Map<String, Integer> phraseCountMap = counters.get(this.gapSize).phraseCountMap;
     for (String queryToken : queryPairMap.keySet()) {
-      float countToUse = phraseCountMap.containsKey(queryToken) ? phraseCountMap.get(queryToken) : 0;
+      float countToUse = phraseCountMap.getOrDefault(queryToken, 0);
       score += countToUse;
     }
 
     return score;
   }
+
   @Override
   public String getName() {
     return "OrderedSequentialPairs" + this.gapSize;

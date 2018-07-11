@@ -53,7 +53,7 @@ public class FeatureExtractorCli {
    * requires the user to supply the index directory and also the directory containing the qrels and topics
    * @param args  indexDir, qrelFile, topicFile, outputFile
    */
-  public static void main(String args[]) throws Exception {
+  public static<K> void main(String args[]) throws Exception {
 
     long curTime = System.nanoTime();
     FeatureExtractionArgs parsedArgs = new FeatureExtractionArgs();
@@ -82,16 +82,15 @@ public class FeatureExtractorCli {
     if (parsedArgs.collection.equals("gov2") || parsedArgs.collection.equals("webxml")) {
       // Open the topics file and read it
       String className = parsedArgs.collection.equals("gov2") ? "Trec" : "Webxml";
-      TopicReader tr = (TopicReader)Class.forName("io.anserini.search.query."+className+"TopicReader")
+      TopicReader<K> tr = (TopicReader<K>)Class.forName("io.anserini.search.query."+className+"TopicReader")
               .getConstructor(Path.class).newInstance(Paths.get(parsedArgs.topicsFile));
-      SortedMap<Integer, Map<String, String>> topics = tr.read();
+      SortedMap<K, Map<String, String>> topics = tr.read();
       LOG.debug(String.format("%d topics found", topics.size()));
 
       WebFeatureExtractor extractor = new WebFeatureExtractor(reader, qrels, topics, extractors);
       extractor.printFeatures(out);
     } else if (parsedArgs.collection.equals("twitter")) {
-      String className = parsedArgs.collection.equals("gov2") ? "Trec" : "Webxml";
-      TopicReader tr = (TopicReader)Class.forName("io.anserini.search.query.MicroblogTopicReader")
+      TopicReader<Integer> tr = (TopicReader<Integer>)Class.forName("io.anserini.search.query.MicroblogTopicReader")
           .getConstructor(Path.class).newInstance(Paths.get(parsedArgs.topicsFile));
       SortedMap<Integer, Map<String, String>> topics = tr.read();
       LOG.debug(String.format("%d topics found", topics.size()));
@@ -102,10 +101,10 @@ public class FeatureExtractorCli {
     }
   }
 
-  private static Map<String,String> convertTopicsFormat(Map<Integer, Map<String, String>> topics) {
+  private static Map<String,String> convertTopicsFormat(Map<String, Map<String, String>> topics) {
     HashMap<String, String> convertedTopics = new HashMap<>(topics.size());
 
-    for (Map.Entry<Integer, Map<String, String>> entry : topics.entrySet()) {
+    for (Map.Entry<String, Map<String, String>> entry : topics.entrySet()) {
       convertedTopics.put(String.valueOf(entry.getKey()), entry.getValue().get("title"));
     }
     return convertedTopics;

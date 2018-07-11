@@ -1,17 +1,15 @@
 package io.anserini.ltr.feature;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.google.common.collect.Sets;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
 import io.anserini.rerank.RerankerContext;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Terms;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +20,7 @@ import java.util.Set;
  * This is a feature extractor that will calculate the
  * unordered count of phrases in the window specified
  */
-public class UnorderedSequentialPairsFeatureExtractor implements FeatureExtractor{
+public class UnorderedSequentialPairsFeatureExtractor<T> implements FeatureExtractor<T> {
 
   protected static ArrayList<Integer> gapSizes = new ArrayList<>();
   protected static Map<Integer, CountBigramPairs.PhraseCounter> counters = new HashMap<>();
@@ -32,14 +30,23 @@ public class UnorderedSequentialPairsFeatureExtractor implements FeatureExtracto
   protected static Map<String, Set<String>> backQueryPairMap = new HashMap<>();
   protected static String lastProcessedId = "";
   protected static Document lastProcessedDoc = null;
-  public static class Deserializer implements JsonDeserializer<UnorderedSequentialPairsFeatureExtractor>
+
+  public static class Deserializer extends StdDeserializer<UnorderedSequentialPairsFeatureExtractor>
   {
+    public Deserializer() {
+      this(null);
+    }
+
+    public Deserializer(Class<?> vc) {
+      super(vc);
+    }
+
     @Override
     public UnorderedSequentialPairsFeatureExtractor
-    deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
-            throws JsonParseException
+    deserialize(JsonParser jsonParser, DeserializationContext context) throws IOException
     {
-      int gapSize = ((JsonObject) json).get("gapSize").getAsInt();
+      JsonNode node = jsonParser.getCodec().readTree(jsonParser);
+      int gapSize = node.get("gapSize").asInt();
       return new UnorderedSequentialPairsFeatureExtractor(gapSize);
     }
   }
@@ -92,10 +99,10 @@ public class UnorderedSequentialPairsFeatureExtractor implements FeatureExtracto
     singleCountMap.put(queryTokens.get(queryTokens.size() -1), 0);
   }
 
-  protected float computeUnorderedFrequencyScore(Document doc, Terms terms, RerankerContext context) throws IOException {
+  protected float computeUnorderedFrequencyScore(Document doc, Terms terms, RerankerContext<T> context) throws IOException {
 
     if (!context.getQueryId().equals(lastProcessedId) || doc != lastProcessedDoc) {
-      resetCounters(context.getQueryId(), doc);
+      resetCounters(context.getQueryId().toString(), doc);
       List<String> queryTokens = context.getQueryTokens();
 
       populateQueryMaps(queryTokens);
@@ -107,7 +114,7 @@ public class UnorderedSequentialPairsFeatureExtractor implements FeatureExtracto
     Map<String, Integer> phraseCountMap = counters.get(gapSize).phraseCountMap;
     // Smoothing count of 1
     for (String queryToken : queryPairMap.keySet()) {
-      float countToUse = phraseCountMap.containsKey(queryToken) ? phraseCountMap.get(queryToken) : 0;
+      float countToUse = phraseCountMap.getOrDefault(queryToken, 0);
       score += countToUse;
     }
 
@@ -115,9 +122,9 @@ public class UnorderedSequentialPairsFeatureExtractor implements FeatureExtracto
   }
 
   @Override
-  public float extract(Document doc, Terms terms, RerankerContext context) {
+  public float extract(Document doc, Terms terms, RerankerContext<T> context) {
     try {
-      return computeUnorderedFrequencyScore(doc,terms,context);
+      return computeUnorderedFrequencyScore(doc, terms, context);
     } catch (IOException e) {
       e.printStackTrace();
       return 0.0f;
